@@ -5,40 +5,33 @@ import rospy
 from cv_bridge import CvBridge
 from duckietown.dtros import DTROS, NodeType
 from sensor_msgs.msg import CompressedImage
+from std_msgs.msg import Bool
+
+TOPIC_NAME = '/gedi/camera_node/image/compressed'
 
 
-TOPIC_NAME = '/r2d2/camera_node/image/compressed'
 class EdgeDetectionNode(DTROS):
     def __init__(self, node_name):
-        
-        super(EdgeDetectionNode, self).__init__(node_name=node_name,node_type=NodeType.PERCEPTION)
+
+        super(EdgeDetectionNode, self).__init__(node_name=node_name, node_type=NodeType.PERCEPTION)
 
         # for converting from CompressedImage to cv2 and vice versa
         self.bridge = CvBridge()
 
-        # subscribing to topic TOPIC_NAME, messaging object type is CompressedImage, on each notify callback is called
+        # subscribing to topic TOPIC_NAME
         self.sub = rospy.Subscriber(TOPIC_NAME, CompressedImage, self.callback, queue_size=1, buff_size="10MB")
 
-        # publishing to the new topic 'image_pub', messaging object type is CompressedImage
-        self.pub = rospy.Publisher('image_pub', CompressedImage, queue_size=1)
+        # publisher to signal if red is detected
+        self.red_detected_pub = rospy.Publisher('red_detected', Bool, queue_size=1)
 
     def callback(self, msg):
         print(f'callback with type ${type(msg)}')
 
         # converting CompressedImage to cv2
         img_cv2 = self.bridge.compressed_imgmsg_to_cv2(msg, "bgr8")
-        img_hsv = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2HSV)
+
+        # Convert to HSV
         hsv_img = cv2.cvtColor(img_cv2, cv2.COLOR_BGR2HSV)
-
-        # Define lower and upper bounds for yellow color in HSV
-        lower_yellow = np.array([20, 100, 100])
-        upper_yellow = np.array([30, 255, 255])
-
-        # Create a mask for yellow pixels
-        yellow_mask = cv2.inRange(hsv_img, lower_yellow, upper_yellow)
-
-        # Apply the mask to the original image
-        yellow_filtered = cv2.bitwise_and(img_cv2, img_cv2, mask=yellow_mask)
 
         # Define lower and upper bounds for red color in HSV
         lower_red1 = np.array([0, 100, 100])
@@ -51,33 +44,19 @@ class EdgeDetectionNode(DTROS):
         red_mask2 = cv2.inRange(hsv_img, lower_red2, upper_red2)
         red_mask = cv2.bitwise_or(red_mask1, red_mask2)
 
-        # Apply the mask to the original image
-        red_filtered = cv2.bitwise_and(img_cv2, img_cv2, mask=red_mask)
+        # Define the region of interest (ROI) as the lower part of the image
+        height, width = red_mask.shape
+        roi = red_mask[int(height*0.7):, :] # Choose the lower 30% of the image
 
-        # Define lower and upper bounds for white color in BGR
-        lower_white = np.array([200, 200, 200])
-        upper_white = np.array([255, 255, 255])
+        # Check if there are any red pixels in the ROI
+        if cv2.countNonZero(roi) > 0:
+            self.red_detected_pub.publish(True)
+        else:
+            self.red_detected_pub.publish(False)
 
-        # Create a mask for white pixels
-        white_mask = cv2.inRange(img_cv2, lower_white, upper_white)
-
-        # Apply the mask to the original image
-        white_filtered = cv2.bitwise_and(img_cv2, img_cv2, mask=white_mask)
-
-        # Combine the filtered images for yellow, red, and white lines
-        lines_filtered = cv2.bitwise_or(yellow_filtered, red_filtered)
-        lines_filtered = cv2.bitwise_or(lines_filtered, white_filtered)
-
-        # Applying Canny edge detection on the filtered image
-        img_filtered = cv2.Canny(lines_filtered, 50, 150)
-
-        # Converting filtered result to CompressedImage
-        img_filtered_compressed = self.bridge.cv2_to_compressed_imgmsg(img_filtered)
-
-        # publishing to 'image_pub'
-        self.pub.publish(img_filtered_compressed)
 
 
 if __name__ == '__main__':
     node = EdgeDetectionNode(node_name='edge_detection_node')
     rospy.spin()
+
