@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import os
+import time
+
 import rospy
 from duckietown_msgs.msg import WheelsCmdStamped
 from duckietown.dtros import DTROS, NodeType
@@ -35,15 +37,27 @@ class WheelsDriver(DTROS):
 
     def run(self):
         wheel = WheelsCmdStamped()
-
         while not rospy.is_shutdown():
             if self.red_detected:
                 # Stop
                 wheel.vel_right = 0
                 wheel.vel_left = 0
+                self.wheels_cmd_pub.publish(wheel)
+                time.sleep(3)
+                wheel.vel_right = 0.23
+                wheel.vel_left = 0.8
+                self.wheels_cmd_pub.publish(wheel)
+                timeout = time.time() + 5
+                while True:
+                    if time.time() > timeout:
+                        break
+                    if not self.red_detected:
+                        wheel.vel_right = 0.23
+                        wheel.vel_left = 0.2
+                        self.wheels_cmd_pub.publish(wheel)
             else:
-                # Move
-                wheel.vel_right = 0.2
+                # Move straight
+                wheel.vel_right = 0.23
                 wheel.vel_left = 0.2
 
             self.wheels_cmd_pub.publish(wheel)

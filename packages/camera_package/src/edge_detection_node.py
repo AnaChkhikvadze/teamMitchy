@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import time
+
 import numpy as np
 import cv2
 import rospy
@@ -46,7 +48,7 @@ class EdgeDetectionNode(DTROS):
 
         # Define the region of interest (ROI) as the lower part of the image
         height, width = red_mask.shape
-        roi = red_mask[int(height*0.7):, :] # Choose the lower 30% of the image
+        roi = red_mask[int(height*0.9):, :] # Choose the lower 30% of the image
 
         # Check if there are any red pixels in the ROI
         if cv2.countNonZero(roi) > 0:
