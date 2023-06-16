@@ -35,39 +35,53 @@ class WheelsDriver(DTROS):
     def red_detected_cb(self, msg):
         self.red_detected = msg.data
 
+    
     def run(self):
         wheel = WheelsCmdStamped()
+        right = 1
         while not rospy.is_shutdown():
+            # detect duck
+            # if self.duck_detected:
+            #     wheel.vel_right = 0
+            #     wheel.vel_left = 0
+            #     self.wheels_cmd_pub.publish(wheel)
+            #     break
+            # # detect red line break for 5 seconds
             if self.red_detected:
-                # Stop
                 wheel.vel_right = 0
                 wheel.vel_left = 0
                 self.wheels_cmd_pub.publish(wheel)
-                time.sleep(3)
-                wheel.vel_right = 0.23
-                wheel.vel_left = 0.8
-                self.wheels_cmd_pub.publish(wheel)
-                timeout = time.time() + 5
-                while True:
-                    if time.time() > timeout:
-                        break
-                    if not self.red_detected:
-                        wheel.vel_right = 0.23
-                        wheel.vel_left = 0.2
-                        self.wheels_cmd_pub.publish(wheel)
+                time.sleep(3.5)
+                if right == 1:
+                    # right turn
+                    wheel.vel_right = 0.32
+                    wheel.vel_left = 0.79
+                    self.wheels_cmd_pub.publish(wheel)
+                    right = 2
+                    timeout = time.time() + 1.61
+                    while True:
+                        if time.time() > timeout:
+                            break
+                elif right == 2:
+                    wheel.vel_right = 0.55
+                    wheel.vel_left = 0.29
+                    self.wheels_cmd_pub.publish(wheel)
+                    timeout = time.time() + 3.49
+                    right = 0
+                    while True:
+                        if time.time() > timeout:
+                            break
+                else:
+                    wheel.vel_right = 0
+                    wheel.vel_left = 0
+                    self.wheels_cmd_pub.publish(wheel)
+                    break
             else:
                 # Move straight
-                wheel.vel_right = 0.23
-                wheel.vel_left = 0.2
+                wheel.vel_right = 0.33
+                wheel.vel_left = 0.3
+                self.wheels_cmd_pub.publish(wheel)
 
-            self.wheels_cmd_pub.publish(wheel)
-
-    def on_shutdown(self):
-        rospy.loginfo('Shutting down...')
-        wheel = WheelsCmdStamped()
-        wheel.vel_right = 0
-        wheel.vel_left = 0
-        self.wheels_cmd_pub.publish(wheel)
 
 
 if __name__ == "__main__":
